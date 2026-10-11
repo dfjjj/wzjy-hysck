@@ -261,7 +261,7 @@ async function sendWechatNotify(content) {
     try {
         await fetch(WECHAT_WEBHOOK, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ msgtype: 'text', text: { content: content } })
         });
     } catch (e) { console.warn('微信通知发送失败:', e); }
