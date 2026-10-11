@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>化验室药剂管理系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f0f4f8; color: #333; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.12); padding: 24px 28px; }
+        h1 { font-size: 26px; color: #1a3c6e; border-left: 6px solid #2d7fc1; padding-left: 18px; margin-bottom: 22px; display: flex; align-items: center; gap: 12px; }
+        h1 small { font-size: 14px; color: #888; font-weight: normal; }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 12px 20px; background: #f7faff; padding: 16px 20px; border-radius: 12px; margin-bottom: 20px; align-items: center; border: 1px solid #e2ecf9; }
+        .toolbar label { font-weight: 600; color: #2c5282; font-size: 14px; }
+        .toolbar input, .toolbar select { padding: 8px 14px; border: 1px solid #cfddee; border-radius: 8px; font-size: 14px; background: white; min-width: 160px; transition: 0.2s; }
+        .toolbar input:focus, .toolbar select:focus { outline: none; border-color: #2d7fc1; box-shadow: 0 0 0 3px rgba(45,127,193,0.15); }
+        .btn { padding: 8px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: #2d7fc1; color: white; }
+        .btn-primary:hover { background: #1f5f94; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-success:hover { background: #1e8449; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-warning:hover { background: #d68910; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-outline { background: transparent; border: 1px solid #2d7fc1; color: #2d7fc1; }
+        .btn-outline:hover { background: #eef4fb; }
+        .stats-bar { display: flex; flex-wrap: wrap; gap: 16px 40px; padding: 12px 0 18px 0; border-bottom: 1px solid #e6edf5; margin-bottom: 18px; font-size: 14px; }
+        .stats-bar span { background: #eaf2fa; padding: 4px 16px; border-radius: 20px; color: #1a3c6e; }
+        .stats-bar .alert-count { background: #fee2e2; color: #b91c1c; }
+        .table-wrapper { overflow-x: auto; border-radius: 10px; border: 1px solid #e2ecf9; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { background: #eaf2fa; color: #1a3c6e; font-weight: 700; padding: 13px 12px; text-align: left; white-space: nowrap; border-bottom: 2px solid #cbdbe9; }
+        td { padding: 11px 12px; border-bottom: 1px solid #eef3f9; vertical-align: middle; }
+        tr:hover td { background: #f6fafe; }
+        .low-stock { background: #fff5f5 !important; }
+        .low-stock td { color: #b22222; }
+        .badge { display: inline-block; padding: 2px 12px; border-radius: 50px; font-size: 12px; font-weight: 600; }
+        .badge-normal { background: #dcfce7; color: #166534; }
+        .badge-low { background: #fee2e2; color: #991b1b; }
+        .badge-empty { background: #fef3c7; color: #92400e; }
+        .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.35); z-index: 999; display: none; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: white; border-radius: 16px; padding: 32px 36px; max-width: 580px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 25px 70px rgba(0,0,0,0.25); animation: modalIn 0.2s ease; }
+        @keyframes modalIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal h2 { font-size: 20px; margin-bottom: 18px; color: #1a3c6e; }
+        .modal .form-group { margin-bottom: 16px; }
+        .modal .form-group label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px; color: #2c3e50; }
+        .modal .form-group input, .modal .form-group select, .modal .form-group textarea { width: 100%; padding: 9px 14px; border: 1px solid #cfddee; border-radius: 8px; font-size: 14px; }
+        .modal .form-group textarea { resize: vertical; min-height: 56px; }
+        .modal .form-row { display: flex; gap: 16px; }
+        .modal .form-row .form-group { flex: 1; }
+        .modal .btn-group { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; }
+        .search-highlight { background: #fde68a; padding: 0 2px; border-radius: 2px; }
+        .notification-area { position: fixed; top: 80px; right: 24px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; max-width: 380px; }
+        .notification { background: white; padding: 14px 20px; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,0.15); border-left: 5px solid #2d7fc1; animation: slideIn 0.3s ease; font-size: 14px; }
+        .notification.warn { border-left-color: #e67e22; }
+        .notification.error { border-left-color: #e74c3c; }
+        .notification.success { border-left-color: #27ae60; }
+        @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .footer-info { margin-top: 20px; text-align: center; color: #999; font-size: 13px; padding: 12px 0 4px; border-top: 1px solid #eee; }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 3000; display: flex; justify-content: center; align-items: center; font-size: 18px; color: #1a3c6e; }
+        .loading-overlay.hidden { display: none; }
+        @media (max-width: 768px) { .container { padding: 14px; } .toolbar { flex-direction: column; align-items: stretch; } .modal { padding: 24px 20px; } }
+    </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">正在连接数据库...</div>
+
+<div class="container">
+    <h1>🧪 化验室药剂管理系统 <small>实时库存 · 智能预警 · Supabase云同步</small></h1>
+
+    <div class="toolbar">
+        <label>🔍 搜索</label>
+        <input type="text" id="searchInput" placeholder="药剂名称 / 存放位置..." oninput="renderTable()">
+        <label>📂 存放位置</label>
+        <select id="locationFilter" onchange="renderTable()"><option value="">全部位置</option></select>
+        <button class="btn btn-primary" onclick="openModal('add')">➕ 新增药剂</button>
+        <button class="btn btn-success" onclick="openModal('in')">📥 入库</button>
+        <button class="btn btn-warning" onclick="openModal('out')">📤 出库</button>
+        <button class="btn btn-outline" onclick="resetAllFilters()">🔄 重置筛选</button>
+    </div>
+
+    <div class="stats-bar" id="statsBar">
+        <span>🧴 总药剂数: <strong id="totalCount">0</strong></span>
+        <span>📦 总库存量: <strong id="totalStock">0</strong></span>
+        <span class="alert-count">⚠️ 低库存/缺货: <strong id="alertCount">0</strong></span>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead><tr><th>药剂名称</th><th>库存数量</th><th>存放位置</th><th>状态</th><th>药剂作用</th><th style="min-width:150px;">操作</th></tr></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+    <div class="footer-info"> 双击表格行可查看详情 · 库存 ≤ 2 显示为低库存预警 · 数据实时同步至Supabase云端</div>
+</div>
+
+<div class="notification-area" id="notificationArea"></div>
+
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modalContent">
+        <h2 id="modalTitle">操作</h2>
+        <div id="modalForm"></div>
+        <div class="btn-group">
+            <button class="btn btn-outline" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary" id="modalConfirmBtn" onclick="confirmModal()">确认</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const DEFAULT_CHEMICALS = [
+    {name:"N-1-萘基乙二胺盐酸盐", stock:5, location:"化验室小试台小柜", desc:"用于显色反应，测定亚硝酸盐等"},
+    {name:"磺胺", stock:3, location:"化验室小试台小柜", desc:"抗菌药物标准品，也用于分析检测"},
+    {name:"L+-抗坏血酸", stock:4, location:"化验室小试台小柜", desc:"还原剂，维生素C分析"},
+    {name:"硫酸银", stock:4, location:"化验室小试台小柜", desc:"催化剂，COD测定"},
+    {name:"1,5-二苯基碳酰二肼", stock:4, location:"化验室小试台小柜", desc:"铬离子显色剂"},
+    {name:"酚酞", stock:2, location:"化验室小试台小柜", desc:"酸碱指示剂(pH8.2-10.0)"},
+    {name:"四苯硼钠", stock:1, location:"化验室小试台小柜", desc:"钾离子沉淀剂"},
+    {name:"硝酸银", stock:5, location:"化验室小试台小柜", desc:"沉淀滴定，氯离子测定"},
+    {name:"玫瑰红银试剂", stock:3, location:"化验室小试台小柜", desc:"银量法指示剂"},
+    {name:"1,10-菲啰啉-一水", stock:6, location:"化验室小试台小柜", desc:"亚铁离子显色剂"},
+    {name:"氨基磺酸", stock:2, location:"化验室小试台小柜", desc:"去除亚硝酸根干扰"},
+    {name:"甲基橙", stock:1, location:"化验室小试台小柜", desc:"酸碱指示剂(pH3.1-4.4)"},
+    {name:"氯化钠", stock:2, location:"化验室小试台小柜", desc:"基准物质，标定用"},
+    {name:"蔗糖", stock:5, location:"化验室小试台小柜", desc:"食品分析标准品"},
+    {name:"硫代硫酸钠", stock:7, location:"化验室小试台小柜", desc:"碘量法滴定剂"},
+    {name:"可溶性淀粉", stock:2, location:"化验室小试台小柜", desc:"碘量法指示剂"},
+    {name:"碳酸氢钠", stock:2, location:"化验室小试台小柜", desc:"缓冲剂，pH调节"},
+    {name:"总氮过硫酸钾", stock:4, location:"化验室小试台小柜", desc:"总氮消解氧化剂"},
+    {name:"总磷过硫酸钾", stock:4, location:"化验室小试台小柜", desc:"总磷消解氧化剂"},
+    {name:"氢氧化钠", stock:4, location:"化验室小试台小柜", desc:"强碱，pH调节"},
+    {name:"酸铵", stock:6, location:"化验室小试台小柜", desc:"磷钼蓝比色法试剂"},
+    {name:"氯化铵", stock:6, location:"化验室小试台小柜", desc:"缓冲溶液配制"},
+    {name:"乙二胺四乙酸二钠", stock:4, location:"化验室小试台小柜", desc:"EDTA络合滴定剂"},
+    {name:"亚硝酸钡", stock:3, location:"化验室小试台小柜", desc:"硫酸盐沉淀剂"},
+    {name:"邻苯二甲酸氢钾", stock:3, location:"化验室小试台小柜", desc:"pH标准物质，碱标定"},
+    {name:"酒石酸锑钾", stock:2, location:"化验室小试台小柜", desc:"总磷显色还原剂"},
+    {name:"硫酸汞", stock:3, location:"化验室小试台小柜", desc:"COD测定掩蔽剂"},
+    {name:"酒石酸钾钠", stock:1, location:"化验室小试台小柜", desc:"络合剂，掩蔽剂"},
+    {name:"七水合硫酸亚铁", stock:2, location:"化验室小试台小柜", desc:"还原剂，COD滴定"},
+    {name:"六水合硫酸亚铁铵", stock:1, location:"化验室小试台小柜", desc:"莫尔盐，标定用"},
+    {name:"三水合柠檬酸三钠", stock:1, location:"化验室小试台小柜", desc:"络合剂，缓冲液"},
+    {name:"尿素", stock:1, location:"化验室小试台小柜", desc:"氨氮分析标准品"},
+    {name:"草酸钠", stock:1, location:"化验室小试台小柜", desc:"高锰酸盐标定基准"},
+    {name:"盐酸羟胺", stock:1, location:"化验室小试台小柜", desc:"还原剂，消除干扰"},
+    {name:"亚甲基蓝", stock:1, location:"化验室小试台小柜", desc:"氧化还原指示剂，染色"},
+    {name:"无水碳酸钠", stock:1, location:"化验室小试台小柜", desc:"酸标定基准物质"},
+    {name:"锌粒", stock:1, location:"化验室小试台小柜", desc:"还原剂，COD消解"},
+    {name:"亚铁氰化钾", stock:1, location:"化验室小试台小柜", desc:"铁离子检测试剂"},
+    {name:"硝酸钾", stock:1, location:"化验室小试台小柜", desc:"氮标准溶液配制"},
+    {name:"十二水合硫酸铁铵", stock:2, location:"原吸室药剂柜", desc:"铁标准液配制"},
+    {name:"异烟酸", stock:4, location:"原吸室药剂柜", desc:"氰化物测定显色剂"},
+    {name:"氯化钾", stock:2, location:"原吸室药剂柜", desc:"原子吸收光谱抑制剂"},
+    {name:"氢氧化铝", stock:3, location:"原吸室药剂柜", desc:"絮凝剂，前处理"},
+    {name:"亚甲基蓝", stock:4, location:"原吸室药剂柜", desc:"阳离子染料测定"},
+    {name:"氯胺T", stock:1, location:"原吸室药剂柜", desc:"消毒剂，氧化剂"},
+    {name:"氧化锌", stock:1, location:"原吸室药剂柜", desc:"锌标准物质"},
+    {name:"二水乙酸锌", stock:1, location:"原吸室药剂柜", desc:"锌盐试剂"},
+    {name:"尿素", stock:1, location:"原吸室药剂柜", desc:"氨氮测定"},
+    {name:"草酸钠", stock:1, location:"原吸室药剂柜", desc:"高锰酸盐标定"},
+    {name:"硫酸锌", stock:1, location:"原吸室药剂柜", desc:"锌标准溶液"},
+    {name:"吡唑啉酮", stock:6, location:"原吸室药剂柜", desc:"显色剂，用于光度分析"},
+    {name:"水合硝酸镧", stock:1, location:"原吸室药剂柜", desc:"原子吸收改进剂"},
+    {name:"茜素络合指示剂", stock:1, location:"原吸室药剂柜", desc:"氟离子指示剂"},
+    {name:"六水合硫酸亚铁铵", stock:4, location:"原吸室药剂柜", desc:"莫尔盐，滴定用"},
+    {name:"无水乙酸钠", stock:8, location:"原吸室药剂柜", desc:"缓冲溶液，pH调节"},
+    {name:"氯化铵", stock:5, location:"原吸室药剂柜", desc:"缓冲液，原子吸收"},
+    {name:"氯化钠", stock:5, location:"原吸室药剂柜", desc:"基体改进剂"},
+    {name:"碳酸氢钠", stock:2, location:"原吸室药剂柜", desc:"pH调节"},
+    {name:"污水磷酸氢二钠", stock:1, location:"原吸室药剂柜", desc:"磷酸盐标准"},
+    {name:"二苯胺磺酸钠", stock:1, location:"原吸室药剂柜", desc:"氧化还原指示剂"},
+    {name:"三水合乙酸钠", stock:1, location:"原吸室药剂柜", desc:"缓冲液配制"},
+    {name:"铬酸钡", stock:1, location:"原吸室药剂柜", desc:"硫酸盐测定"},
+    {name:"磷酸二氢钾", stock:2, location:"原吸室药剂柜", desc:"pH标准物质"},
+    {name:"二水合柠檬酸三钠", stock:4, location:"原吸室药剂柜", desc:"络合剂"},
+    {name:"酒石酸钾钠", stock:9, location:"原吸室药剂柜", desc:"络合掩蔽剂"},
+    {name:"五水合硫酸铜", stock:1, location:"原吸室药剂柜", desc:"铜标准液"},
+    {name:"碳酸钙", stock:2, location:"原吸室药剂柜", desc:"钙标准物质"},
+    {name:"硫酸铝", stock:1, location:"原吸室药剂柜", desc:"混凝剂"},
+    {name:"电解铜粉", stock:1, location:"原吸室药剂柜", desc:"铜标准物质"},
+    {name:"六水合三氯化铁", stock:1, location:"原吸室药剂柜", desc:"铁盐试剂"},
+    {name:"一水合硫酸锰", stock:3, location:"原吸室药剂柜", desc:"锰标准溶液"},
+    {name:"氯化钡", stock:2, location:"原吸室药剂柜", desc:"硫酸盐沉淀"},
+    {name:"十水合四硼酸钠", stock:1, location:"原吸室药剂柜", desc:"硼砂缓冲液"},
+    {name:"十二水合硫酸铝钾", stock:4, location:"原吸室药剂柜", desc:"明矾，净水剂"},
+    {name:"无水硫酸钠", stock:2, location:"原吸室药剂柜", desc:"干燥剂，电解质"},
+    {name:"七水合硫酸锌", stock:6, location:"原吸室药剂柜", desc:"锌标准液"},
+    {name:"硅胶", stock:2, location:"原吸室药剂柜", desc:"干燥剂"},
+    {name:"碘", stock:2, location:"原吸室药剂柜", desc:"碘量法试剂"},
+    {name:"四氧化三铁", stock:1, location:"原吸室药剂柜", desc:"磁性材料标准"},
+    {name:"焦磷酸钠", stock:1, location:"原吸室药剂柜", desc:"分散剂，软水剂"},
+    {name:"铝粉", stock:1, location:"原吸室药剂柜", desc:"金属铝标准"},
+    {name:"九水合硫化钠", stock:1, location:"原吸室药剂柜", desc:"硫化物标准"},
+    {name:"五水合碳酸钠", stock:1, location:"原吸室药剂柜", desc:"碱度标准"},
+    {name:"无水氯化钙", stock:1, location:"原吸室药剂柜", desc:"干燥剂"},
+    {name:"七水硫酸亚铁", stock:1, location:"原吸室药剂柜", desc:"亚铁标准"},
+    {name:"氯化镍", stock:1, location:"原吸室药剂柜", desc:"镍标准液"},
+    {name:"沸石", stock:1, location:"原吸室药剂柜", desc:"吸附剂，催化载体"},
+    {name:"刚果红试纸", stock:1, location:"原吸室药剂柜", desc:"pH试纸(酸性变蓝)"},
+    {name:"纳氏试剂", stock:5, location:"化验室中间小柜", desc:"氨氮比色测定试剂"},
+    {name:"高锰酸钾", stock:1, location:"危化品小仓库", desc:"强氧化剂，滴定用"},
+    {name:"N-N二甲基酰胺", stock:2, location:"危化品小仓库", desc:"极性溶剂，有机合成"},
+    {name:"重铬酸钾", stock:1, location:"危化品小仓库", desc:"强氧化剂，COD测定"},
+    {name:"氯化汞", stock:1, location:"危化品小仓库", desc:"剧毒，防腐剂(慎用)"},
+    {name:"锌粉", stock:1, location:"危化品小仓库", desc:"还原剂"},
+    {name:"亚硝酸钠", stock:1, location:"危化品小仓库", desc:"显色剂，防腐剂"},
+    {name:"凡士林", stock:2, location:"危化品小仓库", desc:"润滑脂，密封保护"},
+    {name:"铬酸钾", stock:2, location:"危化品小仓库", desc:"铬酸洗液配制，指示剂"}
+];
+
+const SUPABASE_URL = 'https://ifelbymvejexwigowpyu.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_QKxHLkZtiNmmlGmn9F6f-A_RNhH9pWS';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const TABLE = 'chemicals';
+
+// 企业微信群机器人 Webhook（替换为你自己的 key）
+const WECHAT_WEBHOOK = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=2050efe4-cab3-45da-b0e8-0b29196e7bab';
+
+let chemicals = [];
+
+async function loadAll() {
+    const { data, error } = await sb.from(TABLE).select('*').order('id');
+    if (error) { showNotification('数据库错误: ' + error.message, 'error'); return null; }
+    return data || [];
+}
+
+async function seedDefaults() {
+    showNotification('数据库为空，正在初始化...', '');
+    const rows = DEFAULT_CHEMICALS.map(c => ({ name: c.name, stock: c.stock, location: c.location, description: c.desc || '' }));
+    const { data, error } = await sb.from(TABLE).insert(rows).select();
+    if (error) { showNotification('初始化失败: ' + error.message, 'error'); return []; }
+    showNotification('已初始化 ' + data.length + ' 条数据', 'success');
+    return data;
+}
+
+async function dbInsert(row) {
+    const { data, error } = await sb.from(TABLE).insert({ name: row.name, stock: row.stock, location: row.location, description: row.desc || '' }).select().single();
+    if (error) throw error;
+    return data;
+}
+
+async function dbUpdate(id, updates) {
+    const { data, error } = await sb.from(TABLE).update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+}
+
+async function dbDelete(id) {
+    const { error } = await sb.from(TABLE).delete().eq('id', id);
+    if (error) throw error;
+}
+
+// 企业微信通知
+async function sendWechatNotify(content) {
+    if (!WECHAT_WEBHOOK || WECHAT_WEBHOOK.includes('YOUR_KEY_HERE')) return;
+    try {
+        await fetch(WECHAT_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ msgtype: 'text', text: { content: content } })
+        });
+    } catch (e) { console.warn('微信通知发送失败:', e); }
+}
+
+async function initApp() {
+    const loader = document.getElementById('loadingOverlay');
+    try {
+        let data = await loadAll();
+        if (data === null) { loader.classList.add('hidden'); return; }
+        if (data.length === 0) data = await seedDefaults();
+        chemicals = data.map(r => ({ id: r.id, name: r.name, stock: r.stock, location: r.location, desc: r.description || '' }));
+        updateLocationFilter();
+        renderTable();
+        setTimeout(checkAlerts, 800);
+    } catch (e) {
+        showNotification('初始化异常: ' + e.message, 'error');
+    } finally {
+        loader.classList.add('hidden');
+    }
+}
+
+function renderTable() {
+    const search = document.getElementById('searchInput').value.trim().toLowerCase();
+    const locFilter = document.getElementById('locationFilter').value;
+    let filtered = chemicals.filter(c => {
+        if (search && !c.name.toLowerCase().includes(search) && !c.location.toLowerCase().includes(search)) return false;
+        if (locFilter && c.location !== locFilter) return false;
+        return true;
+    });
+    document.getElementById('totalCount').textContent = chemicals.length;
+    const totalStock = chemicals.reduce((sum, c) => sum + (c.stock || 0), 0);
+    document.getElementById('totalStock').textContent = totalStock;
+    document.getElementById('alertCount').textContent = chemicals.filter(c => c.stock <= 2).length;
+    const tbody = document.getElementById('tableBody');
+    if (filtered.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#999;">🔎 没有找到匹配的药剂</td></tr>'; return; }
+    let html = '';
+    filtered.forEach(c => {
+        const isLow = c.stock <= 2;
+        let badge = c.stock === 0 ? '<span class="badge badge-empty">缺货</span>' : isLow ? '<span class="badge badge-low">低库存</span>' : '<span class="badge badge-normal">正常</span>';
+        let dn = c.name, dl = c.location;
+        if (search) { const re = new RegExp('(' + search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'); dn = dn.replace(re, '<span class="search-highlight">$1</span>'); dl = dl.replace(re, '<span class="search-highlight">$1</span>'); }
+        html += '<tr class="' + (isLow ? 'low-stock' : '') + '" ondblclick="showDetail(' + c.id + ')"><td><strong>' + dn + '</strong></td><td>' + c.stock + '</td><td>' + dl + '</td><td>' + badge + '</td><td style="max-width:180px;font-size:13px;color:#555;">' + (c.desc || '—') + '</td><td><div class="action-btns"><button class="btn btn-success" style="padding:4px 12px;font-size:12px;" onclick="event.stopPropagation();quickAction(' + c.id + ',\'in\')">+入库</button><button class="btn btn-warning" style="padding:4px 12px;font-size:12px;" onclick="event.stopPropagation();quickAction(' + c.id + ',\'out\')">-出库</button><button class="btn btn-outline" style="padding:4px 12px;font-size:12px;" onclick="event.stopPropagation();editChemical(' + c.id + ')">✎编辑</button><button class="btn btn-danger" style="padding:4px 12px;font-size:12px;" onclick="event.stopPropagation();deleteChemical(' + c.id + ')">🗑删除</button></div></td></tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function updateLocationFilter() {
+    const sel = document.getElementById('locationFilter');
+    const v = sel.value;
+    const locs = [...new Set(chemicals.map(c => c.location).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">全部位置</option>' + locs.map(l => '<option value="' + l + '">' + l + '</option>').join('');
+    sel.value = v || '';
+}
+
+let modalMode = '', editTargetId = null;
+
+function openModal(mode, targetId) {
+    modalMode = mode; editTargetId = targetId || null;
+    const overlay = document.getElementById('modalOverlay');
+    const title = document.getElementById('modalTitle');
+    const form = document.getElementById('modalForm');
+    if (mode === 'add') {
+        title.textContent = '➕ 新增药剂';
+        form.innerHTML = '<div class="form-group"><label>药剂名称 *</label><input type="text" id="mName" placeholder="如：硫酸铜"></div><div class="form-row"><div class="form-group"><label>库存数量</label><input type="number" id="mStock" value="1" min="0"></div><div class="form-group"><label>存放位置 *</label><input type="text" id="mLocation" placeholder="如：化验室A柜"></div></div><div class="form-group"><label>药剂作用/描述</label><textarea id="mDesc" placeholder="可选填写主要用途..."></textarea></div>';
+    } else if (mode === 'in' || mode === 'out') {
+        title.textContent = mode === 'in' ? '📥 入库操作' : ' 出库操作';
+        form.innerHTML = '<div class="form-group"><label>选择药剂 *</label><select id="mChemSelect">' + chemicals.map(c => '<option value="' + c.id + '">' + c.name + ' (当前库存: ' + c.stock + ')</option>').join('') + '</select></div><div class="form-group"><label>数量 *</label><input type="number" id="mQty" value="1" min="1"></div>' + (mode === 'out' ? '<p style="color:#c0392b;font-size:13px;">⚠️ 出库数量不能超过当前库存</p>' : '');
+    } else if (mode === 'edit') {
+        const c = chemicals.find(x => x.id === targetId); if (!c) return;
+        title.textContent = ' 编辑药剂 - ' + c.name;
+        form.innerHTML = '<div class="form-group"><label>药剂名称 *</label><input type="text" id="mName" value="' + c.name + '"></div><div class="form-row"><div class="form-group"><label>库存数量</label><input type="number" id="mStock" value="' + c.stock + '" min="0"></div><div class="form-group"><label>存放位置 *</label><input type="text" id="mLocation" value="' + c.location + '"></div></div><div class="form-group"><label>药剂作用/描述</label><textarea id="mDesc">' + (c.desc || '') + '</textarea></div>';
+    }
+    overlay.classList.add('active');
+}
+
+function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); modalMode = ''; editTargetId = null; }
+
+async function confirmModal() {
+    const btn = document.getElementById('modalConfirmBtn'); btn.disabled = true; btn.textContent = '处理中...';
+    try {
+        if (modalMode === 'add') {
+            const name = document.getElementById('mName').value.trim(), stock = parseInt(document.getElementById('mStock').value) || 0, location = document.getElementById('mLocation').value.trim(), desc = document.getElementById('mDesc').value.trim();
+            if (!name || !location) { showNotification('请填写药剂名称和存放位置！', 'error'); return; }
+            if (chemicals.some(c => c.name === name)) { showNotification('该药剂已存在，请使用入库功能增加库存！', 'warn'); return; }
+            const nr = await dbInsert({ name, stock, location, desc });
+            chemicals.push({ id: nr.id, name: nr.name, stock: nr.stock, location: nr.location, desc: nr.description || '' });
+            updateLocationFilter(); renderTable(); showNotification('✅ 成功添加药剂「' + name + '」', 'success');
+            sendWechatNotify('【新增药剂】\n名称：' + name + '\n库存：' + stock + '\n位置：' + location + '\n描述：' + (desc || '无') + '\n操作人：系统\n时间：' + new Date().toLocaleString('zh-CN'));
+            closeModal();
+        } else if (modalMode === 'in' || modalMode === 'out') {
+            const chemId = parseInt(document.getElementById('mChemSelect').value), qty = parseInt(document.getElementById('mQty').value) || 0, c = chemicals.find(x => x.id === chemId);
+            if (!c) return; if (qty <= 0) { showNotification('请输入有效数量！', 'error'); return; }
+            if (modalMode === 'in') { const ns = c.stock + qty; await dbUpdate(c.id, { stock: ns }); c.stock = ns; showNotification('📥 ' + c.name + ' 入库 ' + qty + ' 件，当前库存 ' + c.stock, 'success'); sendWechatNotify('【入库】\n药剂：' + c.name + '\n入库数量：+' + qty + '\n当前库存：' + c.stock + '\n存放位置：' + c.location + '\n时间：' + new Date().toLocaleString('zh-CN')); }
+            else { if (qty > c.stock) { showNotification('❌ 出库失败：' + c.name + ' 当前库存仅 ' + c.stock + '，不足 ' + qty, 'error'); return; } const ns = c.stock - qty; await dbUpdate(c.id, { stock: ns }); c.stock = ns; showNotification(' ' + c.name + ' 出库 ' + qty + ' 件，当前库存 ' + c.stock, 'success'); sendWechatNotify('【出库】\n药剂：' + c.name + '\n出库数量：-' + qty + '\n当前库存：' + c.stock + (c.stock <= 2 ? '\n⚠️ 库存预警！请及时补充！' : '') + '\n存放位置：' + c.location + '\n时间：' + new Date().toLocaleString('zh-CN')); }
+            renderTable(); closeModal(); checkAlerts();
+        } else if (modalMode === 'edit') {
+            const name = document.getElementById('mName').value.trim(), stock = parseInt(document.getElementById('mStock').value) || 0, location = document.getElementById('mLocation').value.trim(), desc = document.getElementById('mDesc').value.trim();
+            if (!name || !location) { showNotification('请填写药剂名称和存放位置！', 'error'); return; }
+            const c = chemicals.find(x => x.id === editTargetId); if (!c) return;
+            if (chemicals.some(x => x.name === name && x.id !== editTargetId)) { showNotification('该名称已被其他药剂使用！', 'error'); return; }
+            await dbUpdate(c.id, { name, stock, location, description: desc });
+            c.name = name; c.stock = stock; c.location = location; c.desc = desc;
+            updateLocationFilter(); renderTable(); showNotification('✅ 已更新「' + name + '」的信息', 'success');
+            sendWechatNotify('【编辑药剂】\n名称：' + name + '\n库存：' + stock + '\n位置：' + location + '\n描述：' + (desc || '无') + '\n时间：' + new Date().toLocaleString('zh-CN'));
+            closeModal();
+        }
+    } catch (e) { showNotification('操作失败: ' + e.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = '确认'; }
+}
+
+function quickAction(id, mode) { openModal(mode, id); if (mode === 'in' || mode === 'out') setTimeout(() => { const s = document.getElementById('mChemSelect'); if (s) s.value = id; }, 50); }
+function editChemical(id) { openModal('edit', id); }
+
+async function deleteChemical(id) {
+    const c = chemicals.find(x => x.id === id); if (!c) return;
+    if (!confirm('确定要删除药剂「' + c.name + '」吗？此操作不可撤销！')) return;
+    try { await dbDelete(id); chemicals = chemicals.filter(x => x.id !== id); updateLocationFilter(); renderTable(); showNotification('🗑 已删除「' + c.name + '」', 'success'); sendWechatNotify('【删除药剂】\n名称：' + c.name + '\n原库存：' + c.stock + '\n原位置：' + c.location + '\n时间：' + new Date().toLocaleString('zh-CN')); }
+    catch (e) { showNotification('删除失败: ' + e.message, 'error'); }
+}
+
+function showDetail(id) { const c = chemicals.find(x => x.id === id); if (!c) return; showNotification('📋 ' + c.name + ' | 库存: ' + c.stock + ' | 位置: ' + c.location + ' | 作用: ' + (c.desc || '未填写'), ''); }
+
+function showNotification(msg, type) {
+    const area = document.getElementById('notificationArea'), div = document.createElement('div');
+    div.className = 'notification ' + (type || ''); div.textContent = msg; area.appendChild(div);
+    setTimeout(() => { div.style.opacity = '0'; div.style.transform = 'translateX(80px)'; div.style.transition = '0.4s'; setTimeout(() => div.remove(), 400); }, 3500);
+}
+
+function checkAlerts(sendWechat) {
+    const low = chemicals.filter(c => c.stock <= 2);
+    if (low.length === 0) return;
+    if (sendWechat) {
+        let msg = '【库存预警】共 ' + low.length + ' 种药剂需要关注：\n\n';
+        low.forEach(c => {
+            const tag = c.stock === 0 ? '缺货' : '低库存';
+            msg += tag + ' ' + c.name + ' | 剩余: ' + c.stock + ' | 位置: ' + c.location + '\n';
+        });
+        msg += '\n请及时补充！时间：' + new Date().toLocaleString('zh-CN');
+        sendWechatNotify(msg);
+    }
+    low.forEach(c => { showNotification(c.stock === 0 ? ' 缺货警报：' + c.name + ' 已用完，请及时补充！' : ' 低库存：' + c.name + ' 仅剩 ' + c.stock + ' 件（位置：' + c.location + '）', c.stock === 0 ? 'error' : 'warn'); });
+}
+function resetAllFilters() { document.getElementById('searchInput').value = ''; document.getElementById('locationFilter').value = ''; renderTable(); }
+
+window.exportData = function() { const b = new Blob([JSON.stringify(chemicals, null, 2)], {type:'application/json'}), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = '药剂数据备份.json'; a.click(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.getElementById('modalOverlay').addEventListener('click', e => { if (e.target === this) closeModal(); });
+
+initApp();
+</script>
+</body>
+</html>
